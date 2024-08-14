@@ -2,22 +2,24 @@
 
 IMAGE_NAME := tfvars-tools
 CONTAINER_NAME := tfvars-tools-dev
-VERSION := $(shell git describe --tags --always --dirty)
+VERSION := $(shell git describe --tags --always)
 
 all: docker-build docker-test
 
 docker-build:
-	docker build -t $(IMAGE_NAME) .
+	docker build -t $(IMAGE_NAME):$(VERSION)-a .
 
 docker-test:
-	docker run --rm $(IMAGE_NAME) go test ./...
+	docker run --rm $(IMAGE_NAME:$(VERSION)) go test ./...
 
 build:
-	docker run --rm -v $(PWD):/app -w /app $(IMAGE_NAME) go build -o bin/findtfvars ./cmd/findtfvars
-	docker run --rm -v $(PWD):/app -w /app $(IMAGE_NAME) go build -o bin/tfvars-to-args ./cmd/tfvars-to-args
+	docker run $(IMAGE_NAME):$(VERSION)-a go build -o bin/findtfvars ./cmd/findtfvars
+	docker run $(IMAGE_NAME):$(VERSION)-a go build -o bin/tfvars-to-args ./cmd/tfvars-to-args
+	# docker run --rm -v $(PWD):/app -w /app $(IMAGE_NAME):$(VERSION) go build -o bin/findtfvars ./cmd/findtfvars
+	# docker run --rm -v $(PWD):/app -w /app $(IMAGE_NAME):$(VERSION) go build -o bin/tfvars-to-args ./cmd/tfvars-to-args
 
 docker-shell:
-	docker run --rm -it -v $(PWD):/app -w /app $(IMAGE_NAME) /bin/bash
+	docker run --rm -it -v $(PWD):/app -w /app $(IMAGE_NAME):$(VERSION)-a /bin/bash
 
 lint:
 	docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:v1.55 golangci-lint run
