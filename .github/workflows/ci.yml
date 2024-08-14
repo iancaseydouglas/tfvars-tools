@@ -8,12 +8,14 @@ on:
 
 jobs:
   build-and-test:
-    if: "!contains(github.event.head_commit.message, '--skipci')"
+    if: !contains(github.event.head_commit.message, 'skipci')
     runs-on: ubuntu-latest
     container:
       image: golang:1.23-bookworm
     steps:
     - uses: actions/checkout@v3
+    - name: Disable BUILDVCS
+      run: echo "BUILDVCS=false" >> $GITHUB_ENV
     - name: Build
       run: |
         go build -buildvcs=false -o bin/findtfvars ./cmd/findtfvars
