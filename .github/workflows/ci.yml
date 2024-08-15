@@ -1,25 +1,31 @@
 name: CI
 
+env:
+  GO_VERSION: '1.23'
+
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    types: [opened, synchronize, reopened, closed]
+    branches: [main]
 
 jobs:
   build-and-test:
-    if: !contains(github.event.head_commit.message, 'skipci')
     runs-on: ubuntu-latest
     container:
-      image: golang:1.23-bookworm
+      image: golang:${{ env.GO_VERSION }}-bookworm
+    env:
+      BUILDVCS: false
+    if: "!contains(github.event.head_commit.message, 'SKIPCI')"
     steps:
     - uses: actions/checkout@v3
-    - name: Disable BUILDVCS
-      run: echo "BUILDVCS=false" >> $GITHUB_ENV
     - name: Build
       run: |
-        go build -buildvcs=false -o bin/findtfvars ./cmd/findtfvars
-        go build -buildvcs=false -o bin/tfvars-to-args ./cmd/tfvars-to-args
+        echo "Building for repository: ${{ github.repository }}"
+        echo "Building with Go version: ${{ env.GO_VERSION }}"
+        go build -o bin/findtfvars ./cmd/findtfvars
+        go build -o bin/tfvars-to-args ./cmd/tfvars-to-args
     - name: Test
       run: go test ./...
     - name: Lint
@@ -31,19 +37,43 @@ jobs:
       with:
         name: tfvars-tools
         path: bin/
+    - name: Update README
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        LATEST_VERSION=$(git describe --tags --abbrev=0)
+        sed -e "s|{{REPO_NAME}}|${GITHUB_REPOSITORY#*/}|g" \
+            -e "s|{{REPO_FULL_NAME}}|$GITHUB_REPOSITORY|g" \
+            -e "s|{{LATEST_VERSION}}|$LATEST_VERSION|g" \
+            -e "s|{{GO_VERSION}}|${{ env.GO_VERSION }}|g" \
+            README.template.md > README.md
+    - name: Commit README
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add README.md
+        git diff --quiet && git diff --staged --quiet || git commit -m "Update README.md"
+    - name: Push changes
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: ${{ github.ref }}
 
   release:
     needs: build-and-test
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    container:
+      image: golang:${{ env.GO_VERSION }}-bookworm
+    env:
+      BUILDVCS: false
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v4
-        with:
-          go-version: '1.23'
-      - uses: goreleaser/goreleaser-action@v4
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@v4
         with:
           distribution: goreleaser
           version: latest
