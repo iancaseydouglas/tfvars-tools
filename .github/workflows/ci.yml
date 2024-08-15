@@ -14,7 +14,7 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     container:
-      image: golang:${{ env.GO_VERSION }}-bookworm
+      image: golang:${{ GO_VERSION }}-bookworm
     env:
       BUILDVCS: false
     if: "!contains(github.event.head_commit.message, 'SKIPCI')"
@@ -23,7 +23,7 @@ jobs:
     - name: Build
       run: |
         echo "Building for repository: ${{ github.repository }}"
-        echo "Building with Go version: ${{ env.GO_VERSION }}"
+        echo "Building with Go version: ${{ GO_VERSION }}"
         go build -o bin/findtfvars ./cmd/findtfvars
         go build -o bin/tfvars-to-args ./cmd/tfvars-to-args
     - name: Test
@@ -44,7 +44,7 @@ jobs:
         sed -e "s|{{REPO_NAME}}|${GITHUB_REPOSITORY#*/}|g" \
             -e "s|{{REPO_FULL_NAME}}|$GITHUB_REPOSITORY|g" \
             -e "s|{{LATEST_VERSION}}|$LATEST_VERSION|g" \
-            -e "s|{{GO_VERSION}}|${{ env.GO_VERSION }}|g" \
+            -e "s|{{GO_VERSION}}|${{ GO_VERSION }}|g" \
             README.template.md > README.md
     - name: Commit README
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
