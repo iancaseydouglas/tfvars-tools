@@ -145,10 +145,10 @@ For those who prefer their tools like their coffee - instant and strong:
 
 ```bash
 # For Linux
-curl -Lo tfvars-tools.tar.gz https://github.com/yourusername/tfvars-tools/releases/latest/download/tfvars-tools_Linux_x86_64.tar.gz
+curl -Lo tfvars-tools.tar.gz https://github.com/iancaseydouglas/tfvars-tools/releases/latest/download/tfvars-tools_Linux_x86_64.tar.gz
 
 # For macOS
-curl -Lo tfvars-tools.tar.gz https://github.com/yourusername/tfvars-tools/releases/latest/download/tfvars-tools_Darwin_x86_64.tar.gz
+curl -Lo tfvars-tools.tar.gz https://github.com/iancaseydouglas/tfvars-tools/releases/latest/download/tfvars-tools_Darwin_x86_64.tar.gz
 
 # Extract, make executable, and move to a directory in your PATH
 tar xzf tfvars-tools.tar.gz
