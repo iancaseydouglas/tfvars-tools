@@ -1,15 +1,8 @@
+version: 2
+project_name: tfv
 builds:
-  - main: ./cmd/findtfvars
-    binary: findtfvars
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
-  - main: ./cmd/tfvars-to-args
-    binary: tfvars-to-args
+  - main: ./cmd/tfv
+    binary: tfv
     goos:
       - linux
       - darwin
@@ -18,7 +11,7 @@ builds:
       - amd64
       - arm64
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_
       {{- title .Os }}_
@@ -28,11 +21,11 @@ archives:
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     format_overrides:
     - goos: windows
-      format: zip
+      formats: [zip]
 checksum:
   name_template: 'checksums.txt'
 snapshot:
-  name_template: "{{ incpatch .Version }}-next"
+  version_template: "{{ incpatch .Version }}-next"
 changelog:
   sort: asc
   filters:

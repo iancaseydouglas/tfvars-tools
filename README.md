@@ -1,91 +1,102 @@
-# tfvars-tools
+# tfv
 
-Layered `.tfvars` for Terraform root configs. Put shared values in parent directories and overrides in the environment directory. Terraform reads them in order, and the last value set wins.
-
-- `findtfvars` lists `*.tfvars` from the current directory up through its parents.
-- `tfvars-to-args` turns that list into `-var-file=` args, outermost first.
+Layered `.tfvars` for Terraform. Put shared values in parent directories and overrides next to `main.tf`, then run Terraform as usual.
 
 ```bash
-terraform plan $(findtfvars | tfvars-to-args)
+eval "$(tfv init bash)"    # once, in ~/.bashrc or ~/.zshrc (use zsh there)
+
+cd org/service1/dev
+terraform plan
 ```
 
 ## Example
 
 ```
-/org
+org/
 ├── .git
 ├── common.tfvars
-└── service1
+└── service1/
     ├── service1.tfvars
-    └── dev
+    └── dev/
         ├── main.tf
         └── dev.tfvars
 ```
 
 ```console
-$ cd /org/service1/dev
-$ findtfvars | tfvars-to-args
--var-file=/org/common.tfvars -var-file=/org/service1/service1.tfvars -var-file=/org/service1/dev/dev.tfvars
+$ cd org/service1/dev
+$ tfv status
+state: active
+root:  /src/org
+env:   service1/dev
+files, last wins:
+  /src/org/common.tfvars
+  /src/org/service1/service1.tfvars
+  /src/org/service1/dev/dev.tfvars
 ```
 
-`dev.tfvars` overrides `service1.tfvars`, which overrides `common.tfvars`.
+`dev.tfvars` beats `service1.tfvars`, which beats `common.tfvars`. Terraform parses the files itself, so lists, maps and heredocs all work.
 
-Stop at the repo root so stray files in `~` or `/` are ignored:
+Files are resolved each time `terraform` runs, so nothing goes stale when you change directory.
+
+## Usage
 
 ```bash
-findtfvars -stop-at .git | tfvars-to-args
+tfv status                    # what terraform would get
+tfv -deactivate               # pause the wrapper in this shell
+tfv -activate                 # resume it
+
+terraform plan -out=tfplan
+terraform apply tfplan        # uses the values saved in the plan
+terraform -chdir=svc/dev plan # searches from svc/dev
 ```
 
-Climb at most two levels:
+Scripts and CI don't inherit the shell function:
 
 ```bash
-findtfvars -max-depth 2 | tfvars-to-args
-```
-
-Search from somewhere else, and show what was picked:
-
-```bash
-terraform -chdir=service1/dev plan $(findtfvars -d service1/dev | tfvars-to-args -verbose)
+tfv exec plan                 # same as the wrapper
+terraform plan $(tfv -args)   # or explicit args; breaks on paths with spaces
 ```
 
 Other tools and file types:
 
 ```bash
-some_tool $(findtfvars -f .toml | tfvars-to-args -format '--file=%s')
+some_tool $(tfv -args -f .toml -format '--file=%s')
 ```
 
-## Options
+## Search
 
-```
-findtfvars
-  -d DIR            start directory (default .)
-  -f EXT            extension to match (default .tfvars)
-  -max-depth N      parent levels to climb; -1 unlimited, 0 start dir only (default -1)
-  -stop-at NAME     stop at the first directory containing NAME, e.g. .git
+`tfv` climbs from the current directory to the one containing `.git`. If there is no `.git` above, it uses the current directory only and warns, so stray files in `~` or `/` are never picked up.
 
-tfvars-to-args
-  -format FMT       printf format per file (default -var-file=%s)
-  -reverse          keep input order (innermost first)
-  -verbose          print files in precedence order to stderr
-```
+| Flag | Env | Default | |
+|---|---|---|---|
+| `-stop-at NAME` | `TFV_STOP_AT` | `.git` | stop at the directory containing `NAME`; empty climbs to `/` |
+| `-max-depth N` | `TFV_MAX_DEPTH` | `-1` | parent levels to climb; `-1` is unlimited |
+| `-d DIR` | | `.` | start directory |
+| `-f EXT` | | `.tfvars` | extension to match |
+| `-format FMT` | | `-var-file=%s` | argument format for `-args` |
 
-| Env var | Equivalent |
-|---|---|
-| `FINDTFVARS_MAX_DEPTH` | `-max-depth` |
-| `FINDTFVARS_STOP_AT` | `-stop-at` |
-| `TFVARS_TO_ARGS_FORMAT` | `-format` |
+Flags override env vars, and both apply to `status` and `-args`. `tfv exec` reads only the env vars.
 
-Flags override env vars. Paths containing spaces break when the output is passed through `$(...)`.
+Var files are added to `plan`, `apply`, `destroy`, `refresh`, `import` and `console`, ahead of any existing `TF_CLI_ARGS_<command>`.
 
 ## Install
 
 ```bash
-curl -L https://github.com/iancaseydouglas/tfvars-tools/releases/latest/download/tfvars-tools_Linux_x86_64.tar.gz | tar xz
-sudo mv findtfvars tfvars-to-args /usr/local/bin/
+curl -L https://github.com/iancaseydouglas/tfvars-tools/releases/latest/download/tfv_Linux_x86_64.tar.gz | tar xz tfv
+sudo mv tfv /usr/local/bin/
 ```
 
-Replace `Linux` with `Darwin` on macOS and `x86_64` with `arm64` on ARM. Or build from source:
+Replace `Linux` with `Darwin` on macOS and `x86_64` with `arm64` on ARM. Or:
 
 ```bash
-go install github.com/iancaseydouglas/tfvars-tools/cmd/...@latest
+go install github.com/iancaseydouglas/tfvars-tools/cmd/tfv@latest
 ```
+
+## Develop
+
+```bash
+make        # vet, test, gofmt check, build to bin/tfv
+make cross  # compile for other platforms
+```
+
+CI runs the same targets. Pushing a `v*` tag publishes a release.
