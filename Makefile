@@ -1,61 +1,26 @@
-.PHONY: all build test clean docker-build docker-test docker-run docker-shell lint fmt pr-create pr-check dev-start dev-stop dev-exec deps-update docs release
+.PHONY: all build test vet fmt check cross clean
 
-IMAGE_NAME := tfvars-tools
-CONTAINER_NAME := tfvars-tools-dev
-VERSION := $(shell git describe --tags --always)
-
-all: docker-build docker-test
-
-docker-build:
-	docker build -t $(IMAGE_NAME):$(VERSION)-a .
-
-docker-test:
-	docker run --rm $(IMAGE_NAME:$(VERSION)) go test ./...
+all: check build
 
 build:
-	docker run $(IMAGE_NAME):$(VERSION)-a go build -o bin/findtfvars ./cmd/findtfvars
-	docker run $(IMAGE_NAME):$(VERSION)-a go build -o bin/tfvars-to-args ./cmd/tfvars-to-args
-	# docker run --rm -v $(PWD):/app -w /app $(IMAGE_NAME):$(VERSION) go build -o bin/findtfvars ./cmd/findtfvars
-	# docker run --rm -v $(PWD):/app -w /app $(IMAGE_NAME):$(VERSION) go build -o bin/tfvars-to-args ./cmd/tfvars-to-args
+	go build -o bin/tfv ./cmd/tfv
 
-docker-shell:
-	docker run --rm -it -v $(PWD):/app -w /app $(IMAGE_NAME):$(VERSION)-a /bin/bash
+test:
+	go test ./...
 
-lint:
-	docker run --rm -v $(PWD):/app -w /app golangci/golangci-lint:v1.55 golangci-lint run
+vet:
+	go vet ./...
 
 fmt:
-	docker run --rm -v $(PWD):/app -w /app $(IMAGE_NAME) go fmt ./...
+	gofmt -w .
 
-pr-create:
-	@read -p "Enter feature branch name: " branch_name; 	git checkout -b $$branch_name; 	git push -u origin $$branch_name
+check: vet test
+	@test -z "$$(gofmt -l .)" || { gofmt -l .; exit 1; }
 
-pr-check: docker-build docker-test lint fmt
-	@echo "All checks passed. Ready to create a pull request."
+cross:
+	GOOS=linux GOARCH=arm64 go build -o /dev/null ./cmd/tfv
+	GOOS=darwin GOARCH=arm64 go build -o /dev/null ./cmd/tfv
+	GOOS=windows GOARCH=amd64 go build -o /dev/null ./cmd/tfv
 
 clean:
-	rm -rf bin
-	docker rm -f $(CONTAINER_NAME) 2>/dev/null || true
-
-dev-start:
-	docker-compose up -d
-
-dev-stop:
-	docker-compose down
-
-dev-exec:
-	@if [ -z "$(CMD)" ]; then 		echo "Usage: make dev-exec CMD='your command'"; 	else 		docker-compose exec dev $(CMD); 	fi
-
-deps-update:
-	docker run --rm -v $(PWD):/app -w /app $(IMAGE_NAME) go get -u ./...
-	docker run --rm -v $(PWD):/app -w /app $(IMAGE_NAME) go mod tidy
-
-docs:
-	docker run --rm -v $(PWD):/app -w /app $(IMAGE_NAME) go doc -all > DOCS.md
-
-release:
-	@echo "Creating release $(VERSION)"
-	@go mod tidy
-	@git tag $(VERSION)
-	@git push origin $(VERSION)
-	@goreleaser release --rm-dist
+	rm -rf bin dist
